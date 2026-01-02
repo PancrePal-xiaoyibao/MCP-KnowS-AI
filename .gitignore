@@ -1,0 +1,45 @@
+# Environment variables (contains API keys)
+.env
+.env.*
+!.env.example
+
+# Build output
+build/
+dist/
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Config files (may contain sensitive info)
+config.json
+*.yaml
+*.yml
+
+# Documentation (internal only)
+*.pdf
+KnowS_API_Documentation.md
+MinerU_markdown_*.md
+README_reference.md
+
+# Temporary files
+*.tmp
+*.temp

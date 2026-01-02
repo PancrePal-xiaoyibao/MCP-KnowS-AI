@@ -1,0 +1,37 @@
+# Source files
+src/
+tsconfig.json
+
+# Development files
+.env
+.env.*
+*.log
+
+# Test files
+*.test.ts
+*.test.js
+__tests__/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (keep README.md)
+docs/
+plan.md
+开发设计文档.md
+MinerU_markdown_*.md
+README_reference.md
+
+# Build artifacts (keep build/ for distribution)
+node_modules/
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db

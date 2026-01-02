@@ -1,0 +1,58 @@
+{
+  "name": "knows-mcp-server",
+  "version": "0.1.0",
+  "description": "A Model Context Protocol (MCP) server that integrates with the KnowS evidence & question-answering API.",
+  "contributors": "xiao-x-bao community, the 1st AI opensource charity community helping cancer/rare disease/chronic disease patients",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "knows",
+    "evidence",
+    "medical",
+    "clinical",
+    "research",
+    "claude"
+  ],
+  "author": "xiao-x-bao community",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiao-xi-bao/mcp-knows.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xiao-xi-bao/mcp-knows/issues"
+  },
+  "homepage": "https://github.com/xiao-xi-bao/mcp-knows#readme",
+  "files": [
+    "build",
+    "README.md"
+  ],
+  "private": false,
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "knows-mcp-server": "build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "dev": "ts-node src/index.ts",
+    "start": "node build/index.js",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.4.0",
+    "pino": "^9.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.11",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
+}
