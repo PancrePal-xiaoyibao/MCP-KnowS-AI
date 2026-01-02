@@ -4,22 +4,25 @@
 
 ---
 
-<a name="english"></a>
+`<a name="english"></a>`
+
 ## English
 
 ### Overview
+
 A Model Context Protocol (MCP) server that integrates with the **KnowS** evidence & question-answering API. It enables LLMs to use two core workflows:
 
 - **Scenario 1: Patient Q&A and information support**
+
   - Search clinical evidence and retrieve `question_id + evidences`
   - Generate clinical / research / popular-science answers tailored to patients and peer-support communities
-
 - **Scenario 2: Academic retrieval and deep research**
+
   - Fetch structured details for single papers, guidelines, and conference abstracts
   - Run auto-tagging and query history for evidence-based research workflows
 
-
 ### Features
+
 - ✅ MCP server using stdio transport
 - ✅ KnowS HTTP client with `x-api-key` authentication
 - ✅ Clear separation between **patient-facing QA tools** and **research-oriented evidence tools**
@@ -31,11 +34,13 @@ A Model Context Protocol (MCP) server that integrates with the **KnowS** evidenc
 **Important**: To use these tools effectively, please refer to [prompt.md](./prompt.md) for detailed tool calling strategies and workflows.
 
 The prompt guide includes:
+
 - Tool calling chains for different scenarios (patient Q&A, academic research, etc.)
 - How to properly combine `knows_ai_search` → `knows_answer`
 - Best practices and common pitfalls
 
 ### Tech Stack
+
 - Node.js (ES Modules)
 - TypeScript
 - `@modelcontextprotocol/sdk`
@@ -45,27 +50,33 @@ The prompt guide includes:
 ### Installation
 
 #### Option 1: Install from npm (Recommended)
+
 ```bash
 npm install knows-mcp-server
 ```
 
 #### Option 2: Build from source
+
 From project root:
+
 ```bash
 npm install
 ```
 
 Build:
+
 ```bash
 npm run build
 ```
 
 Run (after build):
+
 ```bash
 npm start
 ```
 
 Development (watch):
+
 ```bash
 npm run dev
 ```
@@ -120,16 +131,16 @@ In `claude_desktop_config.json` (or equivalent):
 ```
 
 For **production**, change the environment values accordingly, for example:
+
 - Set `KNOWS_API_BASE_URL` to `https://api.nullht.com`
 - Use your production `KNOWS_API_KEY` (do not reuse test keys in production)
-
-
 
 > Note: In local development, `.env` is loaded automatically; in deployment, the MCP host should pass environment variables via its own configuration.
 
 ### MCP Tools
 
 #### 1. `knows_ai_search`
+
 **Purpose**: Question → evidence search, returns a `question_id` and a list of evidences.
 
 - **Parameters**:
@@ -138,6 +149,7 @@ For **production**, change the environment values accordingly, for example:
 - **Backend API**: `POST /knows/ai_search`
 
 #### 2. `knows_answer`
+
 **Purpose**: Generate a scene-based answer for a given `question_id`.
 
 - **Parameters**:
@@ -147,6 +159,7 @@ For **production**, change the environment values accordingly, for example:
 - **Usage hint**: Use the routing strategy described in the design doc (keywords: 科普/研究/临床) to choose `answer_type` automatically.
 
 #### 3. `knows_evidence_summary`
+
 **Purpose**: Get AI-generated summary for a single evidence item.
 
 - **Parameters**:
@@ -154,6 +167,7 @@ For **production**, change the environment values accordingly, for example:
 - **Backend API**: `POST /knows/evidence/summary`
 
 #### 4. `knows_evidence_highlight`
+
 **Purpose**: Get highlighted original-text snippets for a given evidence (for citation / context).
 
 - **Parameters**:
@@ -161,6 +175,7 @@ For **production**, change the environment values accordingly, for example:
 - **Backend API**: `POST /knows/evidence/highlight`
 
 #### 5. `knows_get_paper_en`
+
 **Purpose**: Get structured details of an English paper.
 
 - **Parameters**:
@@ -169,6 +184,7 @@ For **production**, change the environment values accordingly, for example:
 - **Backend API**: `POST /knows/evidence/get_paper_en`
 
 #### 6. `knows_get_paper_cn`
+
 **Purpose**: Get structured details of a Chinese paper.
 
 - **Parameters**:
@@ -176,6 +192,7 @@ For **production**, change the environment values accordingly, for example:
 - **Backend API**: `POST /knows/evidence/get_paper_cn`
 
 #### 7. `knows_get_guide`
+
 **Purpose**: Get guideline details.
 
 - **Parameters**:
@@ -184,6 +201,7 @@ For **production**, change the environment values accordingly, for example:
 - **Backend API**: `POST /knows/evidence/get_guide`
 
 #### 8. `knows_get_meeting`
+
 **Purpose**: Get conference abstract details.
 
 - **Parameters**:
@@ -192,6 +210,7 @@ For **production**, change the environment values accordingly, for example:
 - **Backend API**: `POST /knows/evidence/get_meeting`
 
 #### 9. `knows_auto_tagging`
+
 **Purpose**: Auto-tagging for research metadata (disease, population, outcome, etc.).
 
 - **Parameters**:
@@ -201,6 +220,7 @@ For **production**, change the environment values accordingly, for example:
 - **Backend API**: `POST /knows/auto_tagging`
 
 #### 10. `knows_list_question`
+
 **Purpose**: Get history of user questions.
 
 - **Parameters**:
@@ -211,6 +231,7 @@ For **production**, change the environment values accordingly, for example:
 - **Backend API**: `POST /knows/list_question`
 
 #### 11. `knows_list_interpretation`
+
 **Purpose**: Get history of single-evidence interpretations.
 
 - **Parameters**:
@@ -233,21 +254,25 @@ Suggested npm scripts (already in `package.json`):
 
 ---
 
-<a name="chinese"></a>
+`<a name="chinese"></a>`
+
 ## 中文
 
 ### 项目概述
+
 这是一个用于对接 **KnowS 问答与证据 API** 的 Model Context Protocol (MCP) 服务器，使大模型能够调用 KnowS 的两大类核心服务场景：
 
 - **场景 1：患者问答和信息求助**
+
   - 检索临床证据，获取 `question_id + evidences`
   - 生成面向患者 / 专业病友的场景化答案（临床 / 学术 / 科普）
-
 - **场景 2：学术检索和深度研究**
+
   - 查询单篇文献、指南、会议等的结构化详情
   - 进行自动标签、历史记录查询等学术研究工作流
 
 ### 功能特性
+
 - ✅ 基于 stdio 传输的 MCP 服务器
 - ✅ 使用 `x-api-key` 认证的 KnowS HTTP 客户端
 - ✅ 清晰区分 **问答/场景工具** 和 **文献/证据工具**
@@ -259,6 +284,7 @@ Suggested npm scripts (already in `package.json`):
 **重要提示**：为了正确使用这些工具，请参考 [prompt.md](./prompt.md) 了解详细的工具调用策略和工作流。
 
 该指南包含：
+
 - 不同场景下的工具调用链路（患者问答、学术研究等）
 - 如何正确组合 `knows_ai_search` → `knows_answer`
 - 最佳实践与常见陷阱
@@ -266,6 +292,7 @@ Suggested npm scripts (already in `package.json`):
 ### 环境变量与 .env
 
 本项目通过环境变量管理配置：
+
 - 本地开发：
   - 使用 `.env` 文件（由 `dotenv` 自动加载）
 - 部署到 MCP 客户端：
@@ -315,6 +342,7 @@ LOG_LEVEL=info
 ```
 
 **生产环境**：请将环境变量值替换为生产环境对应的值，例如：
+
 - 将 `KNOWS_API_BASE_URL` 改为 `https://api.nullht.com`
 - 使用你的生产环境 `KNOWS_API_KEY`（请勿复用测试环境的 key）
 
@@ -325,11 +353,12 @@ LOG_LEVEL=info
 #### 一、问答 / 场景类工具（面向患者 & 专业病友）
 
 - **`knows_ai_search`**：提问 → 检索证据列表
+
   - 参数：`question`、`data_scope[]`（可选，PAPER / PAPER_CN / GUIDE / MEETING）
   - 作用：返回 `question_id + evidences`，后续可用于 `knows_answer` 或文献工具。
   - 优先级：运行时参数 > 环境变量 `DEFAULT_DATA_SCOPE` > 默认全开
-
 - **`knows_answer`**：基于 `question_id` 生成场景化答案
+
   - 参数：`question_id`，`answer_type`（单个值：CLINICAL / RESEARCH / POPULAR_SCIENCE）
   - 场景：
     - 普通患者：多用 `POPULAR_SCIENCE`
@@ -349,6 +378,7 @@ LOG_LEVEL=info
 - **`knows_list_interpretation`**：历史单篇解读列表
 
 典型学术工作流示例：
+
 1. 通过 `knows_ai_search` 找到相关 evidences，并选出若干 `evidence_id`
 2. 用 `knows_evidence_summary` + `knows_evidence_highlight` 理解核心结论与原文段落
 3. 用 `knows_get_paper_en/cn` / `knows_get_guide` / `knows_get_meeting` 获取详细结构化信息
@@ -367,5 +397,4 @@ MIT
 
 欢迎贡献！请提交 issue 或 pull request。
 
-特别感谢[小胰宝](www.xiaoyibao.com.cn)和 [小x宝社区](https://info.xiao-x-bao.com.cn)的贡献与付出，用爱心与人工智能为癌症/罕见病患者及其家庭提供支持！
-
+特别感谢[小胰宝](www.xiaoyibao.com.cn)和 [小x宝社区](https://info.xiao-x-bao.com.cn)的❤️贡献与付出，用爱心与人工智能为癌症/罕见病患者及其家庭提供支持！
