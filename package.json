@@ -1,6 +1,6 @@
 {
   "name": "knows-mcp-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A Model Context Protocol (MCP) server that integrates with the KnowS evidence & question-answering API.",
   "contributors": "xiao-x-bao community, the 1st AI opensource charity community helping cancer/rare disease/chronic disease patients",
   "keywords": [
