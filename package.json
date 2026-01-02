@@ -17,12 +17,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xiao-xi-bao/mcp-knows.git"
+    "url": "git+https://github.com/PancrePal-xiaoyibao/MCP-KnowS-AI.git"
   },
   "bugs": {
-    "url": "https://github.com/xiao-xi-bao/mcp-knows/issues"
+    "url": "https://github.com/PancrePal-xiaoyibao/MCP-KnowS-AI/issues"
   },
-  "homepage": "https://github.com/xiao-xi-bao/mcp-knows#readme",
+  "homepage": "https://github.com/PancrePal-xiaoyibao/MCP-KnowS-AI#readme",
   "files": [
     "build",
     "README.md"
