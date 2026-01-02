@@ -26,6 +26,15 @@ A Model Context Protocol (MCP) server that integrates with the **KnowS** evidenc
 - ✅ TypeScript with strict typing
 - ✅ Jest-based unit/integration test hooks (to be implemented)
 
+### 📖 Usage Guide
+
+**Important**: To use these tools effectively, please refer to [prompt.md](./prompt.md) for detailed tool calling strategies and workflows.
+
+The prompt guide includes:
+- Tool calling chains for different scenarios (patient Q&A, academic research, etc.)
+- How to properly combine `knows_ai_search` → `knows_answer`
+- Best practices and common pitfalls
+
 ### Tech Stack
 - Node.js (ES Modules)
 - TypeScript
@@ -244,6 +253,15 @@ Suggested npm scripts (already in `package.json`):
 - ✅ 清晰区分 **问答/场景工具** 和 **文献/证据工具**
 - ✅ TypeScript 强类型
 - ✅ 预留 Jest 测试脚本
+
+### 📖 使用指南
+
+**重要提示**：为了正确使用这些工具，请参考 [prompt.md](./prompt.md) 了解详细的工具调用策略和工作流。
+
+该指南包含：
+- 不同场景下的工具调用链路（患者问答、学术研究等）
+- 如何正确组合 `knows_ai_search` → `knows_answer`
+- 最佳实践与常见陷阱
 
 ### 环境变量与 .env
 
