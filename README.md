@@ -98,7 +98,7 @@ In `claude_desktop_config.json` (or equivalent):
   "mcpServers": {
     "knows-mcp": {
       "command": "npx",
-      "args": ["knows-mcp-server"],
+      "args": ["-y", "knows-mcp-server"],
       "env": {
         "KNOWS_API_KEY": "your_api_key_here",
         "KNOWS_API_BASE_URL": "https://dev-api.nullht.com",
@@ -284,7 +284,7 @@ LOG_LEVEL=info
   "mcpServers": {
     "knows-mcp": {
       "command": "npx",
-      "args": ["knows-mcp-server"],
+      "args": ["-y", "knows-mcp-server"],
       "env": {
         "KNOWS_API_KEY": "你的_api_key",
         "KNOWS_API_BASE_URL": "https://dev-api.nullht.com",
