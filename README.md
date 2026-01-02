@@ -358,3 +358,14 @@ LOG_LEVEL=info
 ---
 
 如你后续决定固定包名、补充更多 MCP 工具或测试用例，可以在本 README 的基础上增量更新。当前版本已经覆盖了：环境变量 → MCP 部署配置 → 工具参数 → 典型使用场景的完整链路。
+
+### 许可证
+
+MIT
+
+## 贡献
+
+欢迎贡献！请提交 issue 或 pull request。
+
+特别感谢[小胰宝](www.xiaoyibao.com.cn)和 [小x宝社区](https://info.xiao-x-bao.com.cn)的贡献与付出，用爱心与人工智能为癌症/罕见病患者及其家庭提供支持！
+
