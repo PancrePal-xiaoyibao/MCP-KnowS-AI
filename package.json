@@ -1,6 +1,9 @@
 {
-  "name": "knows-mcp-server",
+  "name": "@PancrePal-xiaoyibao/knows-mcp-server",
   "version": "0.1.1",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "description": "A Model Context Protocol (MCP) server that integrates with the KnowS evidence & question-answering API.",
   "contributors": "xiao-x-bao community, the 1st AI opensource charity community helping cancer/rare disease/chronic disease patients",
   "keywords": [
