@@ -68,6 +68,49 @@ async function main() {
   );
 
   server.tool(
+    "knows_batch_answer",
+    {
+      requests: z.array(z.object({
+        question_id: z.string().min(1),
+        answer_type: z.enum(["CLINICAL", "RESEARCH", "POPULAR_SCIENCE"]),
+      })),
+    },
+    async (args) => {
+      const limit = pLimit(5);
+      const promises = args.requests.map((req) => limit(async () => {
+        try {
+          const result = await client.answer({
+            question_id: req.question_id,
+            answer_type: req.answer_type,
+          });
+          return {
+            question_id: req.question_id,
+            status: "success",
+            data: result
+          };
+        } catch (error) {
+          return {
+            question_id: req.question_id,
+            status: "error",
+            error: error instanceof Error ? error.message : String(error)
+          };
+        }
+      }));
+
+      const results = await Promise.all(promises);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(results),
+          },
+        ],
+      };
+    }
+  );
+
+  server.tool(
     "knows_evidence_summary",
     {
       evidence_id: z.string().min(1),
