@@ -1,4 +1,6 @@
 import axios from "axios";
+import axiosRetry from "axios-retry";
+import { LRUCache } from "lru-cache";
 export function createKnowsClient(config, logger) {
     const http = axios.create({
         baseURL: config.baseUrl,
@@ -6,7 +8,20 @@ export function createKnowsClient(config, logger) {
             "x-api-key": config.apiKey,
             "Content-Type": "application/json",
         },
-        timeout: 30000,
+        timeout: 120000,
+    });
+    // Configure retries
+    axiosRetry(http, {
+        retries: 3,
+        retryDelay: axiosRetry.exponentialDelay,
+        retryCondition: (error) => {
+            // Retry on network errors or 5xx status codes
+            return (axiosRetry.isNetworkError(error) ||
+                axiosRetry.isRetryableError(error));
+        },
+        onRetry: (retryCount, error, requestConfig) => {
+            logger.info({ retryCount, error: error.message, url: requestConfig.url }, "Retrying request");
+        },
     });
     // Add response interceptor for error logging
     http.interceptors.response.use((response) => response, (error) => {
@@ -24,6 +39,14 @@ export function createKnowsClient(config, logger) {
         }
         throw error;
     });
+    // Initialize LRU Cache
+    const evidenceCache = new LRUCache({
+        max: 500, // Maximum number of items
+        ttl: 1000 * 60 * 60, // 1 hour TTL
+    });
+    function getCacheKey(type, id, translate) {
+        return `${type}:${id}:${!!translate}`;
+    }
     return {
         async aiSearch(req) {
             const payload = {
@@ -74,38 +97,66 @@ export function createKnowsClient(config, logger) {
             };
         },
         async getPaperEn(req) {
+            const cacheKey = getCacheKey("PAPER", req.evidence_id, req.translate_to_chinese);
+            const cached = evidenceCache.get(cacheKey);
+            if (cached) {
+                logger.debug({ evidence_id: req.evidence_id }, "Cache hit for getPaperEn");
+                return cached;
+            }
             const response = await http.post("/knows/evidence/get_paper_en", {
                 evidence_id: req.evidence_id,
                 translate_to_chinese: req.translate_to_chinese,
             });
             const data = response.data?.data ?? response.data;
             logger.debug({ data }, "knows get_paper_en response");
+            evidenceCache.set(cacheKey, data);
             return data;
         },
         async getPaperCn(req) {
+            const cacheKey = getCacheKey("PAPER_CN", req.evidence_id, false);
+            const cached = evidenceCache.get(cacheKey);
+            if (cached) {
+                logger.debug({ evidence_id: req.evidence_id }, "Cache hit for getPaperCn");
+                return cached;
+            }
             const response = await http.post("/knows/evidence/get_paper_cn", {
                 evidence_id: req.evidence_id,
             });
             const data = response.data?.data ?? response.data;
             logger.debug({ data }, "knows get_paper_cn response");
+            evidenceCache.set(cacheKey, data);
             return data;
         },
         async getGuide(req) {
+            const cacheKey = getCacheKey("GUIDE", req.evidence_id, req.translate_to_chinese);
+            const cached = evidenceCache.get(cacheKey);
+            if (cached) {
+                logger.debug({ evidence_id: req.evidence_id }, "Cache hit for getGuide");
+                return cached;
+            }
             const response = await http.post("/knows/evidence/get_guide", {
                 evidence_id: req.evidence_id,
                 translate_to_chinese: req.translate_to_chinese,
             });
             const data = response.data?.data ?? response.data;
             logger.debug({ data }, "knows get_guide response");
+            evidenceCache.set(cacheKey, data);
             return data;
         },
         async getMeeting(req) {
+            const cacheKey = getCacheKey("MEETING", req.evidence_id, req.translate_to_chinese);
+            const cached = evidenceCache.get(cacheKey);
+            if (cached) {
+                logger.debug({ evidence_id: req.evidence_id }, "Cache hit for getMeeting");
+                return cached;
+            }
             const response = await http.post("/knows/evidence/get_meeting", {
                 evidence_id: req.evidence_id,
                 translate_to_chinese: req.translate_to_chinese,
             });
             const data = response.data?.data ?? response.data;
             logger.debug({ data }, "knows get_meeting response");
+            evidenceCache.set(cacheKey, data);
             return data;
         },
         async autoTagging(req) {
