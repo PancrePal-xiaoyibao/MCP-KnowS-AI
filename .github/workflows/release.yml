@@ -1,12 +1,17 @@
 name: Publish to GitHub Packages
 
 on:
+  # 允许手动触发 (方便测试)
+  workflow_dispatch:
+  # 每次推送到 main 分支时自动触发 (确保构建正常, 可选)
   push:
+    branches:
+      - "main"
     tags:
       - "v*"
 
 jobs:
-  publish:
+  build-and-publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,7 +34,9 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # 只有当 tag 触发，或者手动触发且 confirm 时才发布
       - name: Publish to GitHub Packages
+        if: startsWith(github.ref, 'refs/tags/v')
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
