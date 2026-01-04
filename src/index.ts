@@ -20,6 +20,7 @@ async function main() {
 
   server.tool(
     "knows_ai_search",
+    "Search for clinical evidence and get a question_id. Always the first step before answering.",
     {
       question: z.string().min(1),
       data_scope: z.array(z.enum(["PAPER", "PAPER_CN", "GUIDE", "MEETING"])).optional(),
@@ -46,6 +47,7 @@ async function main() {
 
   server.tool(
     "knows_answer",
+    "Generate a single scenario-based answer using a question_id from search results.",
     {
       question_id: z.string().min(1),
       answer_type: z.enum(["CLINICAL", "RESEARCH", "POPULAR_SCIENCE"]),
@@ -69,6 +71,7 @@ async function main() {
 
   server.tool(
     "knows_batch_answer",
+    "Batch generate answers for multiple questions concurrently. Preferred over knows_answer for multiple items.",
     {
       requests: z.array(z.object({
         question_id: z.string().min(1),
@@ -112,6 +115,7 @@ async function main() {
 
   server.tool(
     "knows_evidence_summary",
+    "Get an AI-generated summary for a specific evidence ID.",
     {
       evidence_id: z.string().min(1),
     },
@@ -133,6 +137,7 @@ async function main() {
 
   server.tool(
     "knows_evidence_highlight",
+    "Retrieve highlighted text segments from the original evidence source.",
     {
       evidence_id: z.string().min(1),
     },
@@ -154,6 +159,7 @@ async function main() {
 
   server.tool(
     "knows_get_paper_en",
+    "Get detailed content of an English paper.",
     {
       evidence_id: z.string().min(1),
       translate_to_chinese: z.boolean().optional(),
@@ -177,6 +183,7 @@ async function main() {
 
   server.tool(
     "knows_get_paper_cn",
+    "Get detailed content of a Chinese paper.",
     {
       evidence_id: z.string().min(1),
     },
@@ -198,6 +205,7 @@ async function main() {
 
   server.tool(
     "knows_get_guide",
+    "Get detailed content of a clinical guideline.",
     {
       evidence_id: z.string().min(1),
       translate_to_chinese: z.boolean().optional(),
@@ -221,6 +229,7 @@ async function main() {
 
   server.tool(
     "knows_get_meeting",
+    "Get detailed content of a medical meeting abstract.",
     {
       evidence_id: z.string().min(1),
       translate_to_chinese: z.boolean().optional(),
@@ -244,6 +253,7 @@ async function main() {
 
   server.tool(
     "knows_auto_tagging",
+    "Automatically extract tags and structured elements from content.",
     {
       content: z.string().optional(),
       evidence_id: z.string().optional(),
@@ -269,6 +279,7 @@ async function main() {
 
   server.tool(
     "knows_list_question",
+    "List historical questions.",
     {
       from_time: z.number().optional(),
       to_time: z.number().optional(),
@@ -296,6 +307,7 @@ async function main() {
 
   server.tool(
     "knows_list_interpretation",
+    "List historical interpretations.",
     {
       from_time: z.number().optional(),
       to_time: z.number().optional(),
@@ -323,6 +335,7 @@ async function main() {
 
   server.tool(
     "knows_batch_get_evidence_details",
+    "Batch retrieve details for multiple evidences (Paper/Guide/Meeting). Highly recommended for retrieving > 1 items.",
     {
       evidences: z.array(z.object({
         evidence_id: z.string().min(1),

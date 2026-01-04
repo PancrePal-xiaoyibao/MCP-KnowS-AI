@@ -8,7 +8,8 @@
 
 ### 🔍 问答类工具（常用）
 - `knows_ai_search` - 检索临床证据，返回 question_id + evidences
-- `knows_answer` - 基于 question_id 生成场景化答案
+- `knows_answer` - 基于 question_id 生成场景化答案（阻塞式）
+- `knows_batch_answer` - **(新)** 批量基于多个 question_id 生成答案，适合多轮对比或深度研究
 
 ### 📚 文献类工具（学术深度使用）
 - `knows_evidence_summary` - 单篇证据 AI 概要
@@ -16,6 +17,12 @@
 - `knows_get_paper_en` / `knows_get_paper_cn` - 英/中文文献详情
 - `knows_get_guide` - 指南详情
 - `knows_get_meeting` - 会议摘要详情
+- `knows_batch_get_evidence_details` - **(新)** 批量获取多篇文献的详细内容，效率远高于单篇获取
+
+### 🌐 MCP 资源 (Resources)
+- `knows://evidence/{type}/{id}` - **(新)** 直接读取文献静态内容。
+  - `type` 取值：`PAPER`, `PAPER_CN`, `GUIDE`, `MEETING`
+  - 适合在已知 ID 时直接引用或作为上下文注入，无需调用 Tool
 
 ### 🔧 辅助工具
 - `knows_auto_tagging` - 自动标签与结构化要素抽取
@@ -44,95 +51,41 @@ knows_answer (生成场景化答案)
 - **专业病友-研究向**（问"有什么研究""最新进展"等）→ `RESEARCH`
 - **专业病友-临床决策**（问"治疗方案""临床建议"等）→ `CLINICAL`
 
-**关键词映射（参考）：**
-- 科普、患者、怎么办、如何处理 → `POPULAR_SCIENCE`
-- 研究、文献、最新进展、证据 → `RESEARCH`
-- 临床、治疗方案、诊疗、医生建议 → `CLINICAL`
-
-**典型对话示例：**
-
-```
-用户："患者使用脂质体四药方案，出现腹泻，怎么处理？"
-
-AI 操作：
-1. knows_ai_search(question="患者使用脂质体四药方案，出现腹泻，怎么处理？")
-   → 返回：{ question_id: "8bad9c37b1c94f3e82e5a8439333b3a6", evidences: [...] }
-
-2. knows_answer(question_id="8bad9c37b1c94f3e82e5a8439333b3a6", answer_type="CLINICAL")
-   → 返回：临床场景化答案
-
-3. 呈现给用户：格式化的临床建议 + 引用的证据来源
-```
-
 ---
 
-### 2️⃣ 学术研究场景
+### 2️⃣ 学术深度对比场景 (批量处理)
 
 **调用流程：**
 ```
-用户提出研究需求
+用户提出多个研究点或需要对比多篇文献
   ↓
 knows_ai_search (检索相关证据)
-  ↓ 获取 evidences 列表
-筛选感兴趣的 evidence_id
+  ↓ 获取多篇 evidences 列表
+knows_batch_get_evidence_details (批量获取文献详情) 
+  ↓ 并行获取详情，速度更快
+[可选] knows_batch_answer (批量生成总结答案)
   ↓
-knows_evidence_summary (快速概要) 或
-knows_get_paper_en/cn (详细结构化信息)
-  ↓
-[可选] knows_evidence_highlight (原文片段引用)
-  ↓
-[可选] knows_auto_tagging (结构化要素抽取)
-  ↓
-[可选] knows_answer (生成病友向总结)
-  ↓
-返回研究结果给用户
+返回综合对比研究结果
 ```
 
 **典型对话示例：**
-
 ```
-用户："帮我找几篇关于胰腺癌免疫治疗的最新研究"
+用户："请详细对比这 3 篇关于胰腺癌免疫治疗的最新研究"
 
 AI 操作：
-1. knows_ai_search(question="胰腺癌免疫治疗最新研究", data_scope=["PAPER", "GUIDE"])
-   → 返回：{ question_id: "xxx", evidences: [ev1, ev2, ev3, ...] }
-
-2. 对前 3 篇感兴趣的证据：
-   - knows_evidence_summary(evidence_id="ev1_id")
-   - knows_evidence_summary(evidence_id="ev2_id")
-   - knows_evidence_summary(evidence_id="ev3_id")
-
-3. 如用户需要详细信息，进一步调用：
-   - knows_get_paper_en(evidence_id="ev1_id", translate_to_chinese=true)
-   - knows_evidence_highlight(evidence_id="ev1_id")
-
-4. 呈现给用户：文献列表 + 核心摘要 + 原文关键段落
+1. knows_ai_search(...) → 获取 ev1, ev2, ev3
+2. knows_batch_get_evidence_details(evidences=[{id:ev1, type:"PAPER"}, ...])
+3. 基于批量返回的详情，进行横向对比分析
 ```
 
 ---
 
-### 3️⃣ 快速验证场景
+## 🛠 性能与可靠性优化 (自动生效)
 
-**调用流程：**
-```
-用户只想要证据列表（不需要答案）
-  ↓
-knows_ai_search (检索证据)
-  ↓
-直接返回 evidences 列表给用户
-```
-
-**典型对话示例：**
-
-```
-用户："有没有关于胰腺癌化疗副作用的文献？给我列个表就行"
-
-AI 操作：
-1. knows_ai_search(question="胰腺癌化疗副作用", data_scope=["PAPER", "PAPER_CN"])
-   → 返回：{ question_id: "xxx", evidences: [...] }
-
-2. 呈现给用户：格式化的文献列表（标题、作者、期刊、年份等）
-```
+本 MCP 内部已实现以下优化，无需特殊配置即可享受：
+1. **并发控制 (Concurrency)**: 批量工具（Batch Tools）内部自动限制并发数，防止触发频率限制。
+2. **智能缓存 (Caching)**: 文献详情（Paper/Guide等）已实现内存缓存，重复读取相同文献将瞬间返回。
+3. **网络容错 (Resilience)**: 具备自动重试机制，应对网络抖动。
 
 ---
 
@@ -140,89 +93,61 @@ AI 操作：
 
 ### ✅ 必须遵守
 
-1. **question_id 传递**
-   - `knows_answer` 的 `question_id` **必须**来自 `knows_ai_search` 的返回结果
-   - ❌ 错误：`knows_answer(question_id="患者使用脂质体四药方案...")`
-   - ✅ 正确：先调 `knows_ai_search` 获取 question_id，再传递给 `knows_answer`
+1. **优先使用批量工具**
+   - 当需要获取 **3 篇以上** 文献详情或答案时，**必须**使用 `knows_batch_get_evidence_details` 或 `knows_batch_answer`，严禁循环调用单次工具。
+   
+2. **question_id 传递**
+   - `knows_answer` 或 `knows_batch_answer` 的 `question_id` **必须**来自 `knows_ai_search` 的返回结果。
 
-2. **answer_type 单选**
-   - `answer_type` 是**字符串**，只能选一个值：`"CLINICAL"` 或 `"RESEARCH"` 或 `"POPULAR_SCIENCE"`
-   - ❌ 错误：`answer_type=["CLINICAL", "RESEARCH"]`
-   - ✅ 正确：`answer_type="CLINICAL"`
+3. **Resources 使用时机**
+   - 当你只是需要向用户展示某篇已知文献的内容，或者作为背景上下文参考时，可以直接使用 Resource URI。
+   - 当需要 AI 进行逻辑处理、总结或翻译时，优先使用 Tool。
 
-3. **优先完整链路**
-   - 除非用户**明确只要文献列表**，否则应该调用完整链路（search → answer）
-   - 大多数提问都期望得到答案，而不是原始证据列表
-
-4. **data_scope 灵活配置**
-   - 如用户没有指定，使用默认配置（环境变量 `DEFAULT_DATA_SCOPE` 或全部）
-   - 如用户明确只要"指南"或"中文文献"，则传递相应的 `data_scope` 参数
+4. **answer_type 单选**
+   - 在 `knows_batch_answer` 中，每个请求也可以独立选择不同的 `answer_type`。
 
 ---
 
 ## 🔄 典型错误与修正
 
-### 错误 1：跳过 search 直接调 answer
+### 错误 1：在循环中调用单次工具
 
 ```
-❌ 错误操作：
-knows_answer(question_id="胰腺癌患者化疗副作用怎么处理？", answer_type="CLINICAL")
+❌ 错误操作（慢且容易出错）：
+for id in [1, 2, 3]:
+    knows_get_paper_en(evidence_id=id)
 
-✅ 正确操作：
-1. knows_ai_search(question="胰腺癌患者化疗副作用怎么处理？")
-2. 获取返回的 question_id（如 "abc123"）
-3. knows_answer(question_id="abc123", answer_type="CLINICAL")
+✅ 正确操作（快且稳定）：
+knows_batch_get_evidence_details(evidences=[{id:1, type:"PAPER"}, {id:2, type:"PAPER"}, ...])
 ```
 
-### 错误 2：answer_type 传数组
+### 错误 2：忽略 Resource 功能
 
 ```
-❌ 错误操作：
-knows_answer(question_id="abc123", answer_type=["CLINICAL", "RESEARCH"])
-
-✅ 正确操作：
-knows_answer(question_id="abc123", answer_type="CLINICAL")
-```
-
-### 错误 3：不需要答案时仍调用 answer
-
-```
-用户："给我列几篇胰腺癌的文献"
-
-❌ 错误操作：
-1. knows_ai_search(...)
-2. knows_answer(...)  ← 用户只要列表，不需要生成答案
-
-✅ 正确操作：
-1. knows_ai_search(...)
-2. 直接返回 evidences 列表
+❌ 错误操作：调用 Tool 获取后展示纯文本
+✅ 优化操作：在回复中告知用户可以通过 Resource 获取原始结构化数据，或直接通过 URI 注入上下文。
 ```
 
 ---
 
 ## 💡 进阶技巧
 
-### 1. 多轮对话优化
-- 如用户追问"再详细点"，可以：
-  - 保留上一次的 question_id，切换 answer_type（如从 POPULAR_SCIENCE 切到 CLINICAL）
-  - 或调用 `knows_evidence_summary` 展示更多证据细节
+### 1. 深度综述生成
+- 先 `knows_ai_search` 获取大量证据。
+- 使用 `knows_batch_get_evidence_details` 获取前 5-10 篇的核心内容。
+- 使用 `knows_batch_answer` 获取不同维度的总结（POPULAR_SCIENCE + CLINICAL）。
+- 整合以上信息生成万字综述。
 
-### 2. 证据溯源
-- 当用户质疑答案时，使用 `knows_evidence_highlight` 展示原文片段
-- 使用 `knows_get_paper_en/cn` 提供完整文献信息
-
-### 3. 结构化要素提取
-- 当用户需要"研究设计""样本量""终点指标"等信息时
-- 使用 `knows_auto_tagging` 自动抽取结构化要素
+### 2. 极速二次查询
+- 由于缓存机制，第二次查询同一批文献详情时，请放心调用批量工具，响应时间接近于零。
 
 ---
 
 ## 📝 总结
 
 **核心原则：**
-1. **先 search，后 answer**（除非用户只要列表）
-2. **question_id 必须来自 search 结果**
-3. **answer_type 根据用户角色和提问风格自动选择**
-4. **灵活组合文献类工具，满足学术深度需求**
+1. **能 Batch，不 Single**（3篇以上必用 Batch）。
+2. **先 Search，后 Answer**。
+3. **善用 Resource 注入静态上下文**。
+4. **利用缓存机制进行深度多轮对话**。
 
-按照本指南操作，可确保 KnowS MCP 工具在各类场景下高效、准确地为用户提供医学知识服务。
