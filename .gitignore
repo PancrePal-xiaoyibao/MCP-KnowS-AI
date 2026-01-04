@@ -33,6 +33,7 @@ Thumbs.db
 config.json
 *.yaml
 *.yml
+!.github/workflows/*.yml
 
 # Documentation (internal only)
 *.pdf
