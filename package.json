@@ -1,0 +1,60 @@
+{
+  "name": "@PancrePal-xiaoyibao/knows-mcp-server",
+  "version": "0.2.0",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "description": "KnowS 医学证据检索与分析平台 MCP Server",
+  "contributors": [
+    {
+      "name": "xiao-x-bao community",
+      "url": "https://github.com/PancrePal-xiaoyibao"
+    }
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "knows",
+    "evidence",
+    "medical",
+    "clinical",
+    "research",
+    "claude"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PancrePal-xiaoyibao/MCP-KnowS-AI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PancrePal-xiaoyibao/MCP-KnowS-AI/issues"
+  },
+  "homepage": "https://github.com/PancrePal-xiaoyibao/MCP-KnowS-AI#readme",
+  "files": [
+    "build",
+    "README.md",
+    "SYSTEM_PROMPT.md"
+  ],
+  "private": false,
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "knows-mcp-server": "build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "dev": "bun --watch run src/index.ts",
+    "start": "node build/index.js",
+    "test": "echo \"No tests yet\" && exit 0",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.4.0"
+  }
+}

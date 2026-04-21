@@ -1,0 +1,36 @@
+# Source files
+src/
+tsconfig.json
+
+# Development files
+.env
+.env.*
+*.log
+
+# Test files
+*.test.ts
+*.test.js
+__tests__/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (keep README.md and SYSTEM_PROMPT.md)
+docs/
+
+# Build artifacts (keep build/ for distribution)
+node_modules/
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Bun
+bun.lock
