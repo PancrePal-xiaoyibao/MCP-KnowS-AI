@@ -1,5 +1,5 @@
 {
-  "name": "@PancrePal-xiaoyibao/knows-mcp-server",
+  "name": "@xiaoyibao_npm/knows-mcp-server",
   "version": "0.2.1",
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
