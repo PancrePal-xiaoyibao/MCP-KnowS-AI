@@ -2,7 +2,8 @@
   "name": "@PancrePal-xiaoyibao/knows-mcp-server",
   "version": "0.2.0",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   },
   "description": "KnowS 医学证据检索与分析平台 MCP Server",
   "contributors": [
