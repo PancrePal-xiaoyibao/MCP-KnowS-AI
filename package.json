@@ -47,7 +47,8 @@
     "watch": "tsc -w",
     "dev": "bun --watch run src/index.ts",
     "start": "node build/index.js",
-    "test": "echo \"No tests yet\" && exit 0",
+    "test": "npm run build && node --test",
+    "smoke": "node scripts/smoke.mjs",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

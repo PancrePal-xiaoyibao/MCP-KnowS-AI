@@ -173,3 +173,49 @@ export interface ApiResponse<T> {
   msg: string;
   data: T;
 }
+
+/** 公开开发者 API（/v1）支持的证据类型 */
+export type PublicEvidenceKind =
+  | "PAPER"
+  | "PAPER_CN"
+  | "MEETING"
+  | "GUIDE"
+  | "TRIAL"
+  | "PACKAGE_INSERT";
+
+/** /v1/evidences/ai_search_* 返回的单条证据（字段较内部 /knows 接口更丰富） */
+export interface PublicEvidence {
+  id: string;
+  title: string;
+  abstract?: string;
+  has_pdf?: boolean;
+  publish_date?: string;
+  impact_factor?: number;
+  study_type?: string;
+  journal?: string;
+  authors?: string[];
+  doi?: string;
+  cas_journal_division?: string;
+  cas_journal_division_sub?: string;
+  wos_jif_quartile?: string;
+  /** 合并多类型检索结果时标记该条证据的来源类型 */
+  evidence_kind?: PublicEvidenceKind;
+}
+
+/** 单个公开端点的原始返回 */
+export interface PublicAiSearchResponse {
+  question_id: string;
+  evidences: PublicEvidence[];
+}
+
+/** 多类型合并检索后的返回 */
+export interface PublicAiSearchMergedResponse {
+  /** 仅单一类型检索成功时保留，便于兼容旧 ai_search 的输出形状 */
+  question_id?: string;
+  /** 每个成功类型各自对应的 question_id */
+  question_ids: Partial<Record<PublicEvidenceKind, string>>;
+  evidences: PublicEvidence[];
+  total: number;
+  /** 部分类型失败时的明细；只要有一类成功就不会抛出 */
+  errors?: Array<{ kind: PublicEvidenceKind; message: string }>;
+}

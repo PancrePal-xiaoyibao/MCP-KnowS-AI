@@ -5,7 +5,9 @@ import { z } from "zod";
 import { KnowSClient } from "./client.js";
 
 const apiKey = process.env.KNOWS_API_KEY;
-const apiHost = process.env.KNOWS_API_HOST ?? "https://dev-api.nullht.com";
+// 公开开发者 API（/v1）只在生产环境提供。接入内部 /knows/* 接口的环境
+// 可通过 KNOWS_API_HOST 显式覆盖（例如开发环境 https://dev-api.nullht.com）。
+const apiHost = process.env.KNOWS_API_HOST ?? "https://api.nullht.com";
 
 if (!apiKey) {
   console.error("KNOWS_API_KEY environment variable is required");
@@ -20,18 +22,23 @@ const server = new McpServer({
   description: "KnowS 医学证据检索与分析平台 MCP Server",
 });
 
-// --- AI 搜索 ---
+// --- AI 搜索（公开开发者 API /v1） ---
 server.tool(
   "ai_search",
-  "AI 检索：用户提问，返回与该问题相关的医学证据列表",
+  "AI 检索：输入问题，返回与之相关的医学证据列表。支持英文论文、中文论文、会议、指南、临床试验、药品说明书六类证据，可一次检索多类。",
   {
     query: z.string().describe("用户提问的问题文本"),
     data_scope: z
-      .array(z.enum(["PAPER", "PAPER_CN", "GUIDE", "MEETING"]))
-      .describe("检索范围的证据类型"),
+      .array(z.enum(["PAPER", "PAPER_CN", "MEETING", "GUIDE", "TRIAL", "PACKAGE_INSERT"]))
+      .optional()
+      .describe('检索的证据类型；省略时默认 ["PAPER", "GUIDE"]'),
   },
   async ({ query, data_scope }) => {
-    const result = await client.aiSearch(query, data_scope);
+    const kinds =
+      data_scope && data_scope.length > 0
+        ? data_scope
+        : (["PAPER", "GUIDE"] as const);
+    const result = await client.aiSearchPublic(query, [...kinds]);
     return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
   }
 );

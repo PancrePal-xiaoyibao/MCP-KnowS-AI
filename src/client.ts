@@ -10,8 +10,44 @@ import type {
   MeetingResponse,
   PaperCnResponse,
   PaperEnResponse,
+  PublicAiSearchMergedResponse,
+  PublicAiSearchResponse,
+  PublicEvidence,
+  PublicEvidenceKind,
   TaggingResponse,
 } from "./types.js";
+
+/**
+ * 公开开发者 API 的证据检索端点（/v1，Bearer 鉴权）。
+ * 这些端点在 api.nullht.com 上可用，与旧的内部 /knows/* 接口并存。
+ */
+export const PUBLIC_EVIDENCE_ENDPOINTS = {
+  PAPER: "/v1/evidences/ai_search_paper_en",
+  PAPER_CN: "/v1/evidences/ai_search_paper_cn",
+  MEETING: "/v1/evidences/ai_search_meeting",
+  GUIDE: "/v1/evidences/ai_search_guide",
+  TRIAL: "/v1/evidences/ai_search_trial",
+  PACKAGE_INSERT: "/v1/evidences/ai_search_package_insert",
+} as const satisfies Record<PublicEvidenceKind, string>;
+
+/** 取证据类型对应的公开端点，未知类型返回 undefined */
+export function publicEvidenceEndpoint(kind: string): string | undefined {
+  return (PUBLIC_EVIDENCE_ENDPOINTS as Record<string, string | undefined>)[kind];
+}
+
+/** 请求超时（毫秒），可用 KNOWS_TIMEOUT_MS 覆盖 */
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+function requestTimeoutMs(): number {
+  const raw = Number(process.env.KNOWS_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_TIMEOUT_MS;
+}
+
+/** 403 表示该接口未对当前 Application 授权，补充可执行的指引 */
+function withAccessHint(status: number, message: string): string {
+  if (status !== 403) return message;
+  return `${message}（该接口未对当前 API key 授权。若使用生产环境 https://api.nullht.com，请改用 ai_search 工具，它已切换到公开的 /v1/evidences/* 接口；内部 /knows/* 接口需要单独申请权限）`;
+}
 
 export class KnowSClient {
   private baseUrl: string;
@@ -30,11 +66,12 @@ export class KnowSClient {
         "x-api-key": this.apiKey,
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(requestTimeoutMs()),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`KnowS API error ${res.status}: ${text}`);
+      throw new Error(withAccessHint(res.status, `KnowS API error ${res.status}: ${text}`));
     }
 
     const json = (await res.json()) as Record<string, unknown>;
@@ -54,11 +91,12 @@ export class KnowSClient {
         "x-api-key": this.apiKey,
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(requestTimeoutMs()),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`KnowS API error ${res.status}: ${text}`);
+      throw new Error(withAccessHint(res.status, `KnowS API error ${res.status}: ${text}`));
     }
 
     const text = await res.text();
@@ -165,5 +203,107 @@ export class KnowSClient {
     page_size?: number;
   }): Promise<ListInterpretationResponse> {
     return this.post("/knows/list_interpretion", params);
+  }
+
+  // -------------------------------------------------------------------------
+  // 公开开发者 API（/v1，Bearer 鉴权）
+  // -------------------------------------------------------------------------
+
+  private async postPublic<T>(path: string, body: Record<string, unknown>): Promise<T> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(requestTimeoutMs()),
+    });
+
+    const text = await res.text();
+
+    if (!res.ok) {
+      throw new Error(`KnowS API error ${res.status}: ${text}`);
+    }
+
+    let json: Record<string, unknown>;
+    try {
+      json = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      throw new Error(`KnowS API 返回了非 JSON 响应: ${text.slice(0, 200)}`);
+    }
+
+    if (json.code !== undefined && json.code !== 0) {
+      throw new Error(`KnowS API error code ${json.code}: ${String(json.msg)}`);
+    }
+
+    return (json.data !== undefined ? json.data : json) as T;
+  }
+
+  /**
+   * 通过公开开发者 API 检索证据，支持一次检索多种证据类型。
+   * 端点为 /v1/evidences/ai_search_{paper_en,paper_cn,meeting,guide,trial,package_insert}。
+   * 采用 Promise.allSettled，单类失败不影响其它类型的结果。
+   */
+  async aiSearchPublic(
+    query: string,
+    kinds: PublicEvidenceKind[]
+  ): Promise<PublicAiSearchMergedResponse> {
+    const unique = [...new Set(kinds)];
+    if (unique.length === 0) {
+      throw new Error("data_scope 不能为空，请至少指定一种证据类型");
+    }
+
+    const settled = await Promise.allSettled(
+      unique.map(async (kind) => {
+        const path = PUBLIC_EVIDENCE_ENDPOINTS[kind];
+        const res = await this.postPublic<PublicAiSearchResponse>(path, { query });
+        return { kind, res };
+      })
+    );
+
+    const questionIds: Partial<Record<PublicEvidenceKind, string>> = {};
+    const evidences: PublicEvidence[] = [];
+    const errors: Array<{ kind: PublicEvidenceKind; message: string }> = [];
+
+    settled.forEach((item, index) => {
+      const kind = unique[index];
+      if (kind === undefined) return;
+      if (item.status === "rejected") {
+        const reason: unknown = item.reason;
+        errors.push({
+          kind,
+          message: reason instanceof Error ? reason.message : String(reason),
+        });
+        return;
+      }
+      const { res } = item.value;
+      if (res.question_id) questionIds[kind] = res.question_id;
+      for (const evidence of res.evidences ?? []) {
+        evidences.push({ ...evidence, evidence_kind: kind });
+      }
+    });
+
+    if (errors.length === unique.length) {
+      throw new Error(
+        `所有证据类型检索均失败：${errors.map((e) => `${e.kind}: ${e.message}`).join("; ")}`
+      );
+    }
+
+    const merged: PublicAiSearchMergedResponse = {
+      question_ids: questionIds,
+      evidences,
+      total: evidences.length,
+    };
+
+    if (errors.length === 0 && unique.length === 1) {
+      const only = unique[0];
+      const questionId = only === undefined ? undefined : questionIds[only];
+      if (questionId !== undefined) merged.question_id = questionId;
+    }
+
+    if (errors.length > 0) merged.errors = errors;
+
+    return merged;
   }
 }
