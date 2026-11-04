@@ -6,6 +6,9 @@ build/
 dist/
 *.tsbuildinfo
 
+# Runtime cache（KnowS MCP 运行时产生的检索/全文缓存，不入版本库）
+cache/
+
 # Bun
 bun.lock
 
