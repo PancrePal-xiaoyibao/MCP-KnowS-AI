@@ -8,9 +8,14 @@ import { test, describe, afterEach } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  DEFAULT_API_HOST,
+  KnowSApiError,
   KnowSClient,
+  LEGACY_SUPPORTED_KINDS,
   PUBLIC_EVIDENCE_ENDPOINTS,
   publicEvidenceEndpoint,
+  resolveApiHost,
+  shouldFallbackToLegacy,
 } from "../build/client.js";
 
 const BASE = "https://api.nullht.com";
@@ -237,5 +242,151 @@ describe("旧内部接口的错误提示", () => {
         return true;
       }
     );
+  });
+});
+
+describe("host 解析与环境变量别名", () => {
+  test("KNOWS_API_HOST 优先级最高", () => {
+    assert.equal(
+      resolveApiHost({
+        KNOWS_API_HOST: "https://a.example.com",
+        KNOWS_API_BASE_URL: "https://b.example.com",
+      }),
+      "https://a.example.com"
+    );
+  });
+
+  test("兼容旧包(0.1.x)的 KNOWS_API_BASE_URL", () => {
+    assert.equal(
+      resolveApiHost({ KNOWS_API_BASE_URL: "https://dev-api.nullht.com" }),
+      "https://dev-api.nullht.com"
+    );
+  });
+
+  test("都未设置时使用默认 host", () => {
+    assert.equal(resolveApiHost({}), DEFAULT_API_HOST);
+  });
+
+  test("去除尾部斜杠，避免拼接出双斜杠", () => {
+    assert.equal(resolveApiHost({ KNOWS_API_HOST: "https://x.example.com///" }), "https://x.example.com");
+  });
+
+  test("空白值回落到默认 host", () => {
+    assert.equal(resolveApiHost({ KNOWS_API_HOST: "   " }), DEFAULT_API_HOST);
+  });
+});
+
+describe("回退判定", () => {
+  test("401/403/404 触发回退", () => {
+    for (const status of [401, 403, 404]) {
+      assert.equal(
+        shouldFallbackToLegacy(new KnowSApiError(status, "/v1/x", "")),
+        true,
+        `status ${status} 应触发回退`
+      );
+    }
+  });
+
+  test("其它状态码与普通错误不触发回退", () => {
+    assert.equal(shouldFallbackToLegacy(new KnowSApiError(500, "/v1/x", "")), false);
+    assert.equal(shouldFallbackToLegacy(new KnowSApiError(429, "/v1/x", "")), false);
+    assert.equal(shouldFallbackToLegacy(new Error("boom")), false);
+    assert.equal(shouldFallbackToLegacy(new TypeError("fetch failed")), false);
+  });
+
+  test("内部接口仅支持四类证据", () => {
+    assert.deepEqual([...LEGACY_SUPPORTED_KINDS].sort(), ["GUIDE", "MEETING", "PAPER", "PAPER_CN"]);
+  });
+});
+
+describe("aiSearchSmart 双通道自适应", () => {
+  test("/v1 返回 403 时自动回退到内部 /knows/ai_search", async () => {
+    const urls = [];
+    restores.push(
+      stubFetch((url) => {
+        urls.push(url);
+        if (url.includes("/v1/evidences/")) {
+          return jsonResponse({ code: 403, message: "Application is not allowed" }, 403);
+        }
+        return jsonResponse({
+          question_id: "legacy-q",
+          evidences: [{ id: "a", title: "Legacy A", summary: "s", type: "PAPER" }],
+        });
+      })
+    );
+
+    const client = new KnowSClient(BASE, "k");
+    const result = await client.aiSearchSmart("q", ["PAPER"]);
+
+    assert.equal(result.total, 1);
+    assert.equal(result.question_id, "legacy-q");
+    assert.equal(result.question_ids.PAPER, "legacy-q");
+    assert.equal(result.evidences[0].evidence_kind, "PAPER");
+    assert.ok(
+      urls.some((u) => u.endsWith("/knows/ai_search")),
+      "应回退请求内部接口"
+    );
+  });
+
+  test("公开 API 正常时不触发回退", async () => {
+    const urls = [];
+    restores.push(
+      stubFetch((url) => {
+        urls.push(url);
+        return jsonResponse({ question_id: "pub-q", evidences: [{ id: "x", title: "X" }] });
+      })
+    );
+
+    const client = new KnowSClient(BASE, "k");
+    const result = await client.aiSearchSmart("q", ["PAPER"]);
+
+    assert.equal(urls.length, 1);
+    assert.ok(urls[0].includes("/v1/evidences/"));
+    assert.equal(result.question_id, "pub-q");
+  });
+
+  test("仅请求内部不支持的类型时给出明确错误", async () => {
+    restores.push(
+      stubFetch((url) => {
+        if (url.includes("/v1/")) return jsonResponse({ code: 403 }, 403);
+        return jsonResponse({ question_id: "q", evidences: [] });
+      })
+    );
+
+    const client = new KnowSClient(BASE, "k");
+    await assert.rejects(
+      () => client.aiSearchSmart("q", ["TRIAL"]),
+      /内部 \/knows\/ai_search 仅支持/
+    );
+  });
+
+  test("混合类型回退时保留可用类型，缺失类型记入 errors", async () => {
+    restores.push(
+      stubFetch((url) => {
+        if (url.includes("/v1/")) return jsonResponse({ code: 403 }, 403);
+        return jsonResponse({ question_id: "q", evidences: [{ id: "a", title: "A" }] });
+      })
+    );
+
+    const client = new KnowSClient(BASE, "k");
+    const result = await client.aiSearchSmart("q", ["PAPER", "TRIAL"]);
+
+    assert.equal(result.total, 1);
+    assert.equal(result.errors?.length, 1);
+    assert.equal(result.errors?.[0].kind, "TRIAL");
+  });
+
+  test("网络错误不触发回退，避免掩盖真实故障", async () => {
+    let calls = 0;
+    restores.push(
+      stubFetch(() => {
+        calls += 1;
+        throw new TypeError("network down");
+      })
+    );
+
+    const client = new KnowSClient(BASE, "k");
+    await assert.rejects(() => client.aiSearchSmart("q", ["PAPER"]), /network down/);
+    assert.equal(calls, 1, "不应发生回退请求");
   });
 });

@@ -2,12 +2,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { KnowSClient } from "./client.js";
+import { KnowSClient, PUBLIC_EVIDENCE_ENDPOINTS, resolveApiHost } from "./client.js";
+import type { PublicEvidenceKind } from "./types.js";
 
 const apiKey = process.env.KNOWS_API_KEY;
-// 公开开发者 API（/v1）只在生产环境提供。接入内部 /knows/* 接口的环境
-// 可通过 KNOWS_API_HOST 显式覆盖（例如开发环境 https://dev-api.nullht.com）。
-const apiHost = process.env.KNOWS_API_HOST ?? "https://api.nullht.com";
+// host 解析集中在 client.ts 的 resolveApiHost()，兼容旧包的 KNOWS_API_BASE_URL。
+const apiHost = resolveApiHost();
 
 if (!apiKey) {
   console.error("KNOWS_API_KEY environment variable is required");
@@ -22,7 +22,28 @@ const server = new McpServer({
   description: "KnowS 医学证据检索与分析平台 MCP Server",
 });
 
-// --- AI 搜索（公开开发者 API /v1） ---
+// --- AI 搜索（公开开发者 API /v1，失败时自动回退内部接口） ---
+
+const BUILTIN_DEFAULT_KINDS: PublicEvidenceKind[] = ["PAPER", "GUIDE"];
+
+/**
+ * 默认检索类型。兼容旧包 knows-mcp-server 0.1.x 的 DEFAULT_DATA_SCOPE；
+ * 优先级：KNOWS_DEFAULT_DATA_SCOPE > DEFAULT_DATA_SCOPE > [PAPER, GUIDE]。
+ * 非法或空值一律回落到内置默认，避免因配置写错导致工具无法使用。
+ */
+function resolveDefaultKinds(): PublicEvidenceKind[] {
+  const raw = process.env.KNOWS_DEFAULT_DATA_SCOPE ?? process.env.DEFAULT_DATA_SCOPE;
+  if (!raw || raw.trim().length === 0) return BUILTIN_DEFAULT_KINDS;
+
+  const allowed = new Set<string>(Object.keys(PUBLIC_EVIDENCE_ENDPOINTS));
+  const parsed = raw
+    .split(",")
+    .map((item) => item.trim().toUpperCase())
+    .filter((item) => allowed.has(item)) as PublicEvidenceKind[];
+
+  return parsed.length > 0 ? parsed : BUILTIN_DEFAULT_KINDS;
+}
+
 server.tool(
   "ai_search",
   "AI 检索：输入问题，返回与之相关的医学证据列表。支持英文论文、中文论文、会议、指南、临床试验、药品说明书六类证据，可一次检索多类。",
@@ -31,14 +52,13 @@ server.tool(
     data_scope: z
       .array(z.enum(["PAPER", "PAPER_CN", "MEETING", "GUIDE", "TRIAL", "PACKAGE_INSERT"]))
       .optional()
-      .describe('检索的证据类型；省略时默认 ["PAPER", "GUIDE"]'),
+      .describe(
+        '检索的证据类型；省略时使用默认值（内置默认 ["PAPER", "GUIDE"]，可由 KNOWS_DEFAULT_DATA_SCOPE 覆盖）'
+      ),
   },
   async ({ query, data_scope }) => {
-    const kinds =
-      data_scope && data_scope.length > 0
-        ? data_scope
-        : (["PAPER", "GUIDE"] as const);
-    const result = await client.aiSearchPublic(query, [...kinds]);
+    const kinds = data_scope && data_scope.length > 0 ? [...data_scope] : resolveDefaultKinds();
+    const result = await client.aiSearchSmart(query, kinds);
     return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
   }
 );

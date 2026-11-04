@@ -198,6 +198,22 @@ export interface PublicEvidence {
   cas_journal_division?: string;
   cas_journal_division_sub?: string;
   wos_jif_quartile?: string;
+  /** 会议类（MEETING）：会议名称 */
+  conference?: string;
+  /** 会议类（MEETING）：数据来源 */
+  data_source?: string;
+  /** 会议类（MEETING）：申办方 */
+  sponsor?: string;
+  /** 指南类（GUIDE）：发布机构 */
+  organizations?: string[];
+  /** 试验类（TRIAL）：试验分期，如 I期 / II期 / III期 */
+  phases?: string;
+  /** 回退到内部 /knows 接口时返回：AI 摘要 */
+  summary?: string;
+  /** 回退到内部 /knows 接口时返回：证据类型 */
+  type?: string;
+  /** 回退到内部 /knows 接口时返回：标签 */
+  label?: string[];
   /** 合并多类型检索结果时标记该条证据的来源类型 */
   evidence_kind?: PublicEvidenceKind;
 }

@@ -35,6 +35,62 @@ export function publicEvidenceEndpoint(kind: string): string | undefined {
   return (PUBLIC_EVIDENCE_ENDPOINTS as Record<string, string | undefined>)[kind];
 }
 
+/** 公开开发者 API 的默认 host */
+export const DEFAULT_API_HOST = "https://api.nullht.com";
+
+/**
+ * 解析 API host。
+ *
+ * 兼容旧版 knows-mcp-server 0.1.x 使用的 KNOWS_API_BASE_URL：从旧包迁移时
+ * 若沿用旧变量名，host 会静默回落到默认值，表现为“配置了却仍 401”。
+ * 优先级：KNOWS_API_HOST > KNOWS_API_BASE_URL > DEFAULT_API_HOST。
+ */
+export function resolveApiHost(env: Record<string, string | undefined> = process.env): string {
+  const host = env.KNOWS_API_HOST ?? env.KNOWS_API_BASE_URL ?? DEFAULT_API_HOST;
+  const trimmed = host.trim().replace(/\/+$/, "");
+  return trimmed.length > 0 ? trimmed : DEFAULT_API_HOST;
+}
+
+/**
+ * 内部 /knows/ai_search 仅支持这四类证据；
+ * TRIAL / PACKAGE_INSERT 只有公开 /v1 接口提供。
+ */
+export const LEGACY_SUPPORTED_KINDS: readonly PublicEvidenceKind[] = [
+  "PAPER",
+  "PAPER_CN",
+  "GUIDE",
+  "MEETING",
+];
+
+/** 带 HTTP 状态码的 API 错误，供上层判断是否需要回退到内部接口 */
+export class KnowSApiError extends Error {
+  readonly status: number;
+  readonly path: string;
+  readonly body: string;
+
+  constructor(status: number, path: string, body: string, message?: string) {
+    super(message ?? `KnowS API error ${status}: ${body}`);
+    this.name = "KnowSApiError";
+    this.status = status;
+    this.path = path;
+    this.body = body;
+  }
+}
+
+/**
+ * 这些状态码说明当前环境未开放、或未授权公开 /v1 接口，可以回退到内部接口：
+ * - 401：该环境的 key 无效（例如内部 key 配了公开 host，或反之）
+ * - 403：key 有效但未授权该接口
+ * - 404：该环境没有这套公开接口
+ * 网络错误与超时不在此列，不应被回退掩盖。
+ */
+const FALLBACK_STATUSES: ReadonlySet<number> = new Set([401, 403, 404]);
+
+/** 判断错误是否应该触发内部接口回退 */
+export function shouldFallbackToLegacy(error: unknown): boolean {
+  return error instanceof KnowSApiError && FALLBACK_STATUSES.has(error.status);
+}
+
 /** 请求超时（毫秒），可用 KNOWS_TIMEOUT_MS 覆盖 */
 const DEFAULT_TIMEOUT_MS = 60_000;
 
@@ -71,7 +127,12 @@ export class KnowSClient {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(withAccessHint(res.status, `KnowS API error ${res.status}: ${text}`));
+      throw new KnowSApiError(
+        res.status,
+        path,
+        text,
+        withAccessHint(res.status, `KnowS API error ${res.status}: ${text}`)
+      );
     }
 
     const json = (await res.json()) as Record<string, unknown>;
@@ -96,7 +157,12 @@ export class KnowSClient {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(withAccessHint(res.status, `KnowS API error ${res.status}: ${text}`));
+      throw new KnowSApiError(
+        res.status,
+        path,
+        text,
+        withAccessHint(res.status, `KnowS API error ${res.status}: ${text}`)
+      );
     }
 
     const text = await res.text();
@@ -223,7 +289,7 @@ export class KnowSClient {
     const text = await res.text();
 
     if (!res.ok) {
-      throw new Error(`KnowS API error ${res.status}: ${text}`);
+      throw new KnowSApiError(res.status, path, text);
     }
 
     let json: Record<string, unknown>;
@@ -285,9 +351,28 @@ export class KnowSClient {
     });
 
     if (errors.length === unique.length) {
-      throw new Error(
-        `所有证据类型检索均失败：${errors.map((e) => `${e.kind}: ${e.message}`).join("; ")}`
-      );
+      const message = `所有证据类型检索均失败：${errors
+        .map((e) => `${e.kind}: ${e.message}`)
+        .join("; ")}`;
+
+      // 必须保留底层 HTTP 状态码：否则 aiSearchSmart 拿到的只是普通 Error，
+      // shouldFallbackToLegacy() 无法识别 401/403/404，回退机制会静默失效。
+      const apiErrors = settled
+        .filter((item): item is PromiseRejectedResult => item.status === "rejected")
+        .map((item) => item.reason)
+        .filter((reason): reason is KnowSApiError => reason instanceof KnowSApiError);
+      const firstApiError = apiErrors[0];
+
+      if (firstApiError !== undefined && apiErrors.length === errors.length) {
+        throw new KnowSApiError(
+          firstApiError.status,
+          firstApiError.path,
+          firstApiError.body,
+          message
+        );
+      }
+
+      throw new Error(message);
     }
 
     const merged: PublicAiSearchMergedResponse = {
@@ -303,6 +388,89 @@ export class KnowSClient {
     }
 
     if (errors.length > 0) merged.errors = errors;
+
+    return merged;
+  }
+
+  /**
+   * 自适应检索：优先公开开发者 API（/v1，Bearer 鉴权）；
+   * 若当前环境未开放或未授权该接口（401/403/404），自动回退到内部 /knows/ai_search。
+   *
+   * 这样两类用户都能开箱使用：
+   * - 公开级 key + 生产 host → 走 /v1，获得六类证据
+   * - 内部授权 key + dev host → 走 /v1 失败后回退内部接口，获得四类证据
+   *
+   * 网络错误与超时不会触发回退，避免掩盖真实故障。
+   */
+  async aiSearchSmart(
+    query: string,
+    kinds: PublicEvidenceKind[]
+  ): Promise<PublicAiSearchMergedResponse> {
+    try {
+      return await this.aiSearchPublic(query, kinds);
+    } catch (error) {
+      if (!shouldFallbackToLegacy(error)) throw error;
+
+      const status = error instanceof KnowSApiError ? error.status : 0;
+      const legacyKinds = kinds.filter((kind) => LEGACY_SUPPORTED_KINDS.includes(kind));
+
+      if (legacyKinds.length === 0) {
+        throw new Error(
+          `当前环境未开放公开 API /v1（HTTP ${status}），且所请求的证据类型（${kinds.join(
+            ", "
+          )}）内部接口不支持。内部 /knows/ai_search 仅支持：${LEGACY_SUPPORTED_KINDS.join(
+            ", "
+          )}；如需检索 TRIAL / PACKAGE_INSERT，请使用具备公开 API 权限的 key 与 https://api.nullht.com`
+        );
+      }
+
+      const merged = await this.aiSearchLegacyMerged(query, legacyKinds);
+
+      const skipped = kinds.filter((kind) => !LEGACY_SUPPORTED_KINDS.includes(kind));
+      if (skipped.length > 0) {
+        merged.errors = [
+          ...(merged.errors ?? []),
+          ...skipped.map((kind) => ({
+            kind,
+            message: "已回退到内部 /knows/ai_search，该类型仅公开 API(/v1) 支持，本次未能检索",
+          })),
+        ];
+      }
+
+      return merged;
+    }
+  }
+
+  /**
+   * 内部 /knows/ai_search 回退：一次请求可含多类证据，但返回结果混合且不带类型标记，
+   * 因此仅在单一类型时才能标记 evidence_kind。
+   */
+  private async aiSearchLegacyMerged(
+    query: string,
+    kinds: PublicEvidenceKind[]
+  ): Promise<PublicAiSearchMergedResponse> {
+    const res = await this.post<AiSearchResponse>("/knows/ai_search", {
+      query,
+      data_scope: [...kinds],
+    });
+
+    const singleKind = kinds.length === 1 ? kinds[0] : undefined;
+    const evidences: PublicEvidence[] = (res.evidences ?? []).map((evidence) => ({
+      ...(evidence as PublicEvidence),
+      ...(singleKind === undefined ? {} : { evidence_kind: singleKind }),
+    }));
+
+    const questionIds: Partial<Record<PublicEvidenceKind, string>> = {};
+    if (res.question_id !== undefined && singleKind !== undefined) {
+      questionIds[singleKind] = res.question_id;
+    }
+
+    const merged: PublicAiSearchMergedResponse = {
+      question_ids: questionIds,
+      evidences,
+      total: evidences.length,
+    };
+    if (res.question_id !== undefined) merged.question_id = res.question_id;
 
     return merged;
   }

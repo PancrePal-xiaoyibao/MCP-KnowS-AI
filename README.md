@@ -20,7 +20,9 @@ KnowS 医学证据检索与分析平台的 MCP (Model Context Protocol) Server�
 | 变量 | 必填 | 说明 |
 |------|------|------|
 | `KNOWS_API_KEY` | 是 | KnowS API 密钥，在 [developers.nullht.com](https://developers.nullht.com/) 申请 |
-| `KNOWS_API_HOST` | 否 | API 地址，默认 `https://api.nullht.com`（公开开发者 API）。若要接入内部 `/knows/*` 接口，可覆盖为 `https://dev-api.nullht.com` |
+| `KNOWS_API_HOST` | 否 | API 地址，默认 `https://api.nullht.com`（公开开发者 API）。接入内部 `/knows/*` 接口的环境可覆盖为 `https://dev-api.nullht.com` |
+| `KNOWS_API_BASE_URL` | 否 | `KNOWS_API_HOST` 的**别名**，兼容旧包 `knows-mcp-server` 0.1.x。两者同时设置时以 `KNOWS_API_HOST` 优先 |
+| `KNOWS_DEFAULT_DATA_SCOPE` | 否 | `ai_search` 省略 `data_scope` 时的默认类型，逗号分隔，如 `PAPER,GUIDE`。兼容旧包无前缀版的 `DEFAULT_DATA_SCOPE`，非法值自动回落内置默认 |
 | `KNOWS_TIMEOUT_MS` | 否 | 单次请求超时毫秒数，默认 `60000` |
 
 ### Claude Code 配置
@@ -96,13 +98,35 @@ KNOWS_API_KEY=your_key npm run smoke
 
 ## 工具列表
 
-KnowS 有两套 API。`ai_search` 使用**公开开发者 API**（`/v1/evidences/*`，Bearer 鉴权），
-开箱可用；其余工具使用**内部 API**（`/knows/*`），需要单独向 KnowS 申请授权，
-否则在生产环境调用会返回 `403 Application is not allowed to access the requested API`。
+### 两套 API 与自动适配
+
+KnowS 对外有两套 HTTP 接口：
+
+| 接口组 | 路径 | 鉴权 | 能力 |
+|---|---|---|---|
+| 公开开发者 API | `/v1/evidences/*` | `Authorization: Bearer` | 6 类证据检索 |
+| 内部 API | `/knows/*` | `x-api-key` | 14 个工具（含 AI 摘要、场景总结、全文详情等）|
+
+`ai_search` 采用**双通道自适应**：优先请求公开 `/v1` 接口；若当前环境未开放或未授权
+（HTTP `401` / `403` / `404`），自动回退到内部 `/knows/ai_search`。
+网络错误与超时**不会**触发回退，避免掩盖真实故障。
+
+因此三种典型配置都能直接使用：
+
+| 你的情况 | 实际行为 |
+|---|---|
+| 公开级 key + `https://api.nullht.com` | 走 `/v1`，可用 6 类证据（含 `TRIAL` / `PACKAGE_INSERT`）|
+| 内部授权 key + 内部 host | `/v1` 不通时回退 `/knows`，可用 4 类证据（`PAPER` / `PAPER_CN` / `GUIDE` / `MEETING`）|
+| 沿用旧包变量名 `KNOWS_API_BASE_URL` | 自动识别，不会因变量名不符而静默回落默认 host |
+
+其余 13 个工具依赖内部 `/knows/*`，需单独向 KnowS 申请授权；未授权时调用会返回
+`403 Application is not allowed to access the requested API`，并在错误信息中提示改用 `ai_search`。
+
+### 工具清单
 
 | 工具 | 接口 | 说明 |
 |------|------|------|
-| `ai_search` | 公开 `/v1` | AI 检索，返回相关医学证据列表。`data_scope` 支持 `PAPER` / `PAPER_CN` / `MEETING` / `GUIDE` / `TRIAL` / `PACKAGE_INSERT`，可一次检索多类（省略时默认 `["PAPER","GUIDE"]`） |
+| `ai_search` | 公开 `/v1` → 回退内部 `/knows` | AI 检索，返回相关医学证据列表。`data_scope` 支持 `PAPER` / `PAPER_CN` / `MEETING` / `GUIDE` / `TRIAL` / `PACKAGE_INSERT`，可一次检索多类（省略时默认 `["PAPER","GUIDE"]`，可由 `KNOWS_DEFAULT_DATA_SCOPE` 覆盖） |
 | `evidence_summary` | 内部 `/knows` | 单篇证据 AI 概要总结 |
 | `all_evidence_summary` | 内部 `/knows` | 获取所有证据的 AI 总结 |
 | `evidence_highlight` | 内部 `/knows` | 获取证据被引用的原文内容 |
